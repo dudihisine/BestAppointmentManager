@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://appointment_user:${DB_PASSWORD}@db:5432/appointment_manager
+      - REDIS_URL=redis://redis:6379/0
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
+      - TIMEZONE_DEFAULT=${TIMEZONE_DEFAULT:-America/New_York}
+      - DEBUG=False
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: python worker.py
+    environment:
+      - DATABASE_URL=postgresql://appointment_user:${DB_PASSWORD}@db:5432/appointment_manager
+      - REDIS_URL=redis://redis:6379/0
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
+      - TIMEZONE_DEFAULT=${TIMEZONE_DEFAULT:-America/New_York}
+      - DEBUG=False
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=appointment_manager
+      - POSTGRES_USER=appointment_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

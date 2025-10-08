@@ -113,6 +113,17 @@ dmypy.json
 temp/
 tmp/
 
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*-debug.log
+firebase-export-*/
+service-account-key.json
+serviceAccountKey.json
+
 # Application specific
 test_data/
 debug_*.py

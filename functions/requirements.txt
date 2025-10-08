@@ -1,0 +1,6 @@
+firebase-functions>=0.1.0
+firebase-admin>=6.4.0
+google-cloud-firestore>=2.14.0
+twilio>=9.0.0
+python-dateutil>=2.8.2
+pytz>=2023.3
