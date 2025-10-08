@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ owner.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 fw-bold">Dashboard</h1>
+                    <p class="text-muted mb-0">{{ today }}</p>
+                </div>
+                <div>
+                    <span class="badge bg-primary fs-6">{{ owner.default_intent.value.title() }} Mode</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Today's Appointments</h6>
+                            <h2 class="mb-0">{{ appointment_count }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar-check fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Projected Revenue</h6>
+                            <h2 class="mb-0">{{ total_revenue }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Waitlist Clients</h6>
+                            <h2 class="mb-0">{{ waitlist_stats.total_entries }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Optimization Tips</h6>
+                            <h2 class="mb-0">{{ suggestions|length }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-lightbulb fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Today's Schedule -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-day me-2"></i>
+                        Today's Schedule
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if appointments %}
+                        <div class="timeline">
+                            {% for apt in appointments %}
+                            <div class="appointment-card card mb-3">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-2">
+                                            <div class="text-center">
+                                                <div class="h5 mb-0 text-primary">{{ apt.start_time }}</div>
+                                                <small class="text-muted">{{ apt.duration }}min</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="mb-1">{{ apt.client_name }}</h6>
+                                            <p class="mb-1 text-muted">{{ apt.service_name }}</p>
+                                            <small class="text-muted">
+                                                <i class="fas fa-phone me-1"></i>
+                                                {{ apt.phone }}
+                                            </small>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <span class="badge bg-{{ 'success' if apt.status == 'confirmed' else 'warning' }}">
+                                                {{ apt.status.title() }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2 text-end">
+                                            <div class="h6 mb-0 text-success">{{ apt.price }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Appointments Today</h5>
+                            <p class="text-muted">Your schedule is clear for today.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Optimization Suggestions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        Optimization Suggestions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if suggestions %}
+                        {% for suggestion in suggestions %}
+                        <div class="alert alert-info mb-2">
+                            <small>
+                                <strong>{{ suggestion.type.replace('_', ' ').title() }}:</strong>
+                                {{ suggestion.suggestion }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Your schedule looks optimized!
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Waitlist Overview -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        Waitlist Overview
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if waitlist_stats.by_service %}
+                        {% for service_stat in waitlist_stats.by_service %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ service_stat.service }}</span>
+                            <span class="badge bg-primary">{{ service_stat.count }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No clients on waitlist</p>
+                    {% endif %}
+                    
+                    {% if waitlist_stats.high_priority > 0 %}
+                    <hr>
+                    <small class="text-warning">
+                        <i class="fas fa-star me-1"></i>
+                        {{ waitlist_stats.high_priority }} high priority clients
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>
+                        Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="refreshSchedule()">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Refresh Schedule
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="window.location.href='/book'">
+                            <i class="fas fa-plus me-2"></i>
+                            Manual Booking
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="exportSchedule()">
+                            <i class="fas fa-download me-2"></i>
+                            Export Today's Schedule
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshSchedule() {
+    window.location.reload();
+}
+
+function exportSchedule() {
+    // Simple CSV export of today's appointments
+    const appointments = {{ appointments | tojson }};
+    
+    if (appointments.length === 0) {
+        alert('No appointments to export today.');
+        return;
+    }
+    
+    let csv = 'Time,Client,Service,Phone,Price,Status\n';
+    
+    appointments.forEach(apt => {
+        csv += `"${apt.start_time}","${apt.client_name}","${apt.service_name}","${apt.phone}","${apt.price}","${apt.status}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `schedule-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Auto-refresh every 5 minutes
+setInterval(() => {
+    window.location.reload();
+}, 5 * 60 * 1000);
+
+// Add real-time clock
+function updateClock() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    document.title = `Dashboard - ${timeString}`;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Select Time - {{ owner.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold">Choose Your Time</h1>
+                <p class="lead text-muted">Select your preferred appointment slot</p>
+            </div>
+
+            <!-- Booking Summary -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-user me-2"></i>
+                        Booking Summary
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Client:</strong> {{ client.name }}</p>
+                            <p class="mb-1"><strong>Phone:</strong> {{ client.phone }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Service:</strong> {{ service.name }}</p>
+                            <p class="mb-1"><strong>Duration:</strong> {{ service.duration_min }} minutes</p>
+                            <p class="mb-0"><strong>Price:</strong> ${{ "%.0f"|format(service.price_cents / 100) }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Slots -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">
+                        <i class="fas fa-clock me-2"></i>
+                        Available Time Slots
+                    </h5>
+                    
+                    <form method="post" action="/confirm-booking" id="slotForm">
+                        <input type="hidden" name="client_id" value="{{ client.id }}">
+                        <input type="hidden" name="service_id" value="{{ service.id }}">
+                        <input type="hidden" name="slot_start" id="selected_slot">
+                        
+                        <div class="row g-3">
+                            {% for slot in slots %}
+                            <div class="col-md-4">
+                                <div class="card time-slot" data-slot="{{ slot.start_dt.isoformat() }}">
+                                    <div class="card-body text-center">
+                                        <div class="h6 mb-2">{{ slot.formatted_time }}</div>
+                                        <div class="text-muted small">{{ slot.price }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if not slots %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Available Slots</h5>
+                            <p class="text-muted">
+                                Sorry, there are no available slots for your selected time preference.
+                            </p>
+                            <a href="/book" class="btn btn-primary">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Try Different Time
+                            </a>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="/book" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Back to Booking
+                            </a>
+                            <button type="submit" class="btn btn-success" id="confirmBtn" disabled>
+                                <i class="fas fa-check me-2"></i>
+                                Confirm Booking
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const timeSlots = document.querySelectorAll('.time-slot');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const selectedSlotInput = document.getElementById('selected_slot');
+    
+    timeSlots.forEach(slot => {
+        slot.addEventListener('click', function() {
+            // Remove previous selection
+            timeSlots.forEach(s => s.classList.remove('selected'));
+            
+            // Add selection to clicked slot
+            this.classList.add('selected');
+            
+            // Update hidden input
+            selectedSlotInput.value = this.dataset.slot;
+            
+            // Enable confirm button
+            confirmBtn.disabled = false;
+        });
+    });
+});
+</script>
+{% endblock %}

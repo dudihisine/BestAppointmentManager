@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Appointment Manager{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+        
+        .card {
+            border: none;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        
+        .service-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .service-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .time-slot {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .time-slot:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .time-slot.selected {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .dashboard-stat {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+        }
+        
+        .appointment-card {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .status-pending {
+            color: var(--warning-color);
+        }
+        
+        .status-confirmed {
+            color: var(--success-color);
+        }
+        
+        .status-cancelled {
+            color: var(--danger-color);
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            padding: 4rem 0;
+        }
+        
+        .feature-icon {
+            width: 3rem;
+            height: 3rem;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        
+        /* AI Suggestions - Prevent disappearing */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .suggestion-item {
+            position: relative !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        .suggestions-container {
+            position: relative;
+        }
+        
+        /* Prevent Bootstrap alerts from auto-dismissing */
+        .alert.suggestion-item {
+            display: block !important;
+        }
+        
+        .alert.suggestion-item .btn-close {
+            display: none !important;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-calendar-check me-2"></i>
+                {% if owner %}{{ owner.name }}{% else %}Appointment Manager{% endif %}
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/book">
+                            <i class="fas fa-calendar-plus me-1"></i>Book Appointment
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/appointments">
+                            <i class="fas fa-list me-1"></i>My Appointments
+                        </a>
+                    </li>
+                       <li class="nav-item dropdown">
+                           <a class="nav-link dropdown-toggle" href="#" id="ownerDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                               <i class="fas fa-user-tie me-1"></i>Owner
+                           </a>
+                           <ul class="dropdown-menu" aria-labelledby="ownerDropdown">
+                               <li><a class="dropdown-item" href="/owner/dashboard">
+                                   <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                               </a></li>
+                               <li><a class="dropdown-item" href="/owner/waitlist">
+                                   <i class="fas fa-users-clock me-2"></i>Waitlist
+                               </a></li>
+                               <li><a class="dropdown-item" href="/messages">
+                                   <i class="fab fa-whatsapp me-2"></i>Messages (Test)
+                               </a></li>
+                               <li><hr class="dropdown-divider"></li>
+                               <li><a class="dropdown-item" href="/owner">
+                                   <i class="fas fa-cog me-2"></i>Settings
+                               </a></li>
+                           </ul>
+                       </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-top mt-5 py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-calendar-check me-2"></i>
+                        Powered by AI Appointment Assistant
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-clock me-1"></i>
+                        Real-time scheduling & optimization
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Auto-hide alerts after 5 seconds (but NOT suggestion alerts)
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert:not(.suggestion-item)');
+            alerts.forEach(alert => {
+                // Only auto-dismiss alerts that have close buttons and are not suggestions
+                if (alert.querySelector('.btn-close') && !alert.classList.contains('suggestion-item')) {
+                    setTimeout(() => {
+                        const bsAlert = new bootstrap.Alert(alert);
+                        bsAlert.close();
+                    }, 5000);
+                }
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

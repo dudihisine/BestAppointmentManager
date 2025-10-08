@@ -1,0 +1,32 @@
+# FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Environment and configuration
+python-dotenv==1.0.0
+pydantic-settings==2.0.3
+
+# HTTP client for Twilio API
+httpx==0.25.2
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Redis and job queue
+redis==5.0.1
+rq==1.15.1
+rq-scheduler==0.14.0
+
+# Time and scheduling
+pytz==2023.3
+
+# Testing
+pytest==7.4.3
+
+# Web interface
+jinja2==3.1.2
+python-multipart==0.0.6
+httpx==0.25.2

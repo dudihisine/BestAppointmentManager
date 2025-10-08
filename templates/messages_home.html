@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Messages - {{ owner.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-list {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .conversation-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .conversation-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .conversation-item.active {
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .unread-badge {
+        min-width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        font-size: 12px;
+    }
+    
+    .last-message {
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .timestamp {
+        color: #999;
+        font-size: 12px;
+    }
+    
+    .avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #25d366, #128c7e);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+    }
+    
+    .whatsapp-green {
+        background-color: #25d366;
+        border-color: #25d366;
+    }
+    
+    .whatsapp-green:hover {
+        background-color: #128c7e;
+        border-color: #128c7e;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 fw-bold">
+                        <i class="fab fa-whatsapp me-2 text-success"></i>
+                        WhatsApp Messages (Test Mode)
+                    </h1>
+                    <p class="text-muted mb-0">Local testing interface - simulates WhatsApp conversations</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info btn-sm" onclick="copyAllConversations()">
+                        <i class="fas fa-copy me-1"></i>Copy All
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="clearAllConversations()">
+                        <i class="fas fa-trash me-1"></i>Clear All
+                    </button>
+                    <a href="/owner/dashboard" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle me-2"></i>
+        {{ request.query_params.get('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Conversations List -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-comments me-2"></i>
+                        Conversations
+                    </h5>
+                    <span class="badge bg-primary">{{ total_conversations }}</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if conversations %}
+                        <div class="chat-list">
+                            {% for conv in conversations %}
+                            <div class="conversation-item p-3 border-bottom" 
+                                 onclick="openChat('{{ conv.phone }}')"
+                                 data-phone="{{ conv.phone }}">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar me-3">
+                                        {{ conv.client_name[0].upper() }}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="mb-1">{{ conv.client_name }}</h6>
+                                                <small class="text-muted">{{ conv.phone }}</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="timestamp">
+                                                    {{ conv.last_timestamp.strftime('%H:%M') }}
+                                                </div>
+                                                {% if conv.unread_count > 0 %}
+                                                <span class="badge bg-success unread-badge mt-1">
+                                                    {{ conv.unread_count }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="last-message mt-1">
+                                            {% if conv.is_from_client %}
+                                            <i class="fas fa-reply me-1 text-success"></i>
+                                            {% else %}
+                                            <i class="fas fa-share me-1 text-primary"></i>
+                                            {% endif %}
+                                            {{ conv.last_message }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fab fa-whatsapp fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Conversations Yet</h5>
+                            <p class="text-muted">Start a new conversation by entering a phone number below</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Start New Conversation -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Start New Conversation
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form onsubmit="startNewChat(event)">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="phoneNumber" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phoneNumber" 
+                                       placeholder="+1234567890" required>
+                                <div class="form-text">Enter phone number with country code (e.g., +1234567890)</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="clientName" class="form-label">Client Name (Optional)</label>
+                                <input type="text" class="form-control" id="clientName" 
+                                       placeholder="John Doe">
+                                <div class="form-text">Will be auto-generated if not provided</div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn whatsapp-green text-white">
+                                <i class="fab fa-whatsapp me-2"></i>
+                                Start Chat
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Test Scenarios -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-flask me-2"></i>
+                        Quick Test Scenarios
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Click to quickly create test conversations with common scenarios:</p>
+                    
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-primary w-100" 
+                                    onclick="createTestScenario('booking', '+1234567890', 'John Smith')">
+                                <i class="fas fa-calendar-plus me-2"></i>
+                                New Booking Request
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-warning w-100" 
+                                    onclick="createTestScenario('waitlist', '+1234567891', 'Sarah Johnson')">
+                                <i class="fas fa-users-clock me-2"></i>
+                                Waitlist Request
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-danger w-100" 
+                                    onclick="createTestScenario('cancel', '+1234567892', 'Mike Wilson')">
+                                <i class="fas fa-times-circle me-2"></i>
+                                Cancellation Request
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-info w-100" 
+                                    onclick="createTestScenario('reschedule', '+1234567893', 'Emma Davis')">
+                                <i class="fas fa-edit me-2"></i>
+                                Reschedule Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        How to Use This Test Interface
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li><strong>Start a conversation:</strong> Enter a phone number and click "Start Chat"</li>
+                        <li><strong>Simulate client messages:</strong> Type as if you're the client</li>
+                        <li><strong>See bot responses:</strong> The system will respond automatically using WhatsApp logic</li>
+                        <li><strong>Test scenarios:</strong> Use quick test buttons for common situations</li>
+                        <li><strong>Switch perspectives:</strong> Toggle between client and owner messages</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openChat(phone) {
+    window.location.href = `/messages/chat/${encodeURIComponent(phone)}`;
+}
+
+function startNewChat(event) {
+    event.preventDefault();
+    const phone = document.getElementById('phoneNumber').value.trim();
+    if (phone) {
+        window.location.href = `/messages/chat/${encodeURIComponent(phone)}`;
+    }
+}
+
+async function createTestScenario(scenario, phone, clientName) {
+    try {
+        // First, start the chat
+        window.location.href = `/messages/chat/${encodeURIComponent(phone)}?scenario=${scenario}&name=${encodeURIComponent(clientName)}`;
+    } catch (error) {
+        console.error('Error creating test scenario:', error);
+        alert('Error creating test scenario. Please try again.');
+    }
+}
+
+async function copyAllConversations() {
+    try {
+        const conversations = document.querySelectorAll('.conversation-item');
+        let allConversationsText = `WhatsApp Test Conversations Export - ${new Date().toLocaleString()}\n`;
+        allConversationsText += `Business: {{ owner.name }}\n`;
+        allConversationsText += '=' + '='.repeat(60) + '\n\n';
+        
+        if (conversations.length === 0) {
+            allConversationsText += 'No conversations found.\n';
+        } else {
+            // Get conversation details from each item
+            conversations.forEach((conv, index) => {
+                const clientName = conv.querySelector('h6').textContent.trim();
+                const phone = conv.querySelector('.text-muted').textContent.trim();
+                const lastMessage = conv.querySelector('.last-message').textContent.trim();
+                const timestamp = conv.querySelector('.timestamp').textContent.trim();
+                
+                allConversationsText += `Conversation ${index + 1}:\n`;
+                allConversationsText += `Client: ${clientName}\n`;
+                allConversationsText += `Phone: ${phone}\n`;
+                allConversationsText += `Last Message (${timestamp}): ${lastMessage}\n`;
+                allConversationsText += '-'.repeat(40) + '\n\n';
+            });
+        }
+        
+        allConversationsText += `\nTotal Conversations: {{ total_conversations }}\n`;
+        allConversationsText += `Export Time: ${new Date().toISOString()}\n`;
+        
+        // Copy to clipboard
+        await navigator.clipboard.writeText(allConversationsText);
+        
+        // Show success feedback
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+        button.classList.remove('btn-outline-info');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-info');
+        }, 2000);
+        
+        console.log('All conversations copied to clipboard');
+        
+    } catch (error) {
+        console.error('Error copying conversations:', error);
+        alert('Error copying conversations. Please try again.');
+    }
+}
+
+async function clearAllConversations() {
+    if (confirm('Are you sure you want to clear all conversations? This cannot be undone.')) {
+        try {
+            const response = await fetch('/messages/clear-all', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error clearing conversations. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error clearing conversations:', error);
+            alert('Error clearing conversations. Please try again.');
+        }
+    }
+}
+
+// Auto-refresh conversations every 30 seconds
+setInterval(() => {
+    if (document.visibilityState === 'visible') {
+        window.location.reload();
+    }
+}, 30000);
+</script>
+{% endblock %}

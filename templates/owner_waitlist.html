@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block title %}Waitlist Management - {{ owner.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 fw-bold">
+                        <i class="fas fa-users-clock me-2"></i>
+                        Waitlist Management
+                    </h1>
+                    <p class="text-muted mb-0">{{ today }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/owner/dashboard" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle me-2"></i>
+        {{ request.query_params.get('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        {{ request.query_params.get('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Waitlist Summary -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Waitlist Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h3 text-primary mb-0">{{ total_entries }}</div>
+                                <small class="text-muted">Total Entries</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h3 text-danger mb-0">{{ high_priority_count }}</div>
+                                <small class="text-muted">High Priority</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if service_summary %}
+                    <h6 class="mb-2">By Service:</h6>
+                    <div class="list-group list-group-flush">
+                        {% for service, stats in service_summary.items() %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <strong>{{ service }}</strong>
+                                {% if stats.high_priority > 0 %}
+                                <span class="badge bg-danger ms-1">{{ stats.high_priority }} priority</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-secondary rounded-pill">{{ stats.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>
+                        Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Refresh Waitlist
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="window.location.href='/book'">
+                            <i class="fas fa-plus me-2"></i>
+                            Add to Waitlist
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="exportWaitlist()">
+                            <i class="fas fa-download me-2"></i>
+                            Export Waitlist
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Waitlist Entries -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Waitlist Entries
+                    </h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active" onclick="showAll()">All</button>
+                        <button class="btn btn-outline-secondary" onclick="showPriority()">Priority Only</button>
+                        <button class="btn btn-outline-secondary" onclick="showToday()">Today</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if waitlist_entries %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="waitlistTable">
+                                <thead>
+                                    <tr>
+                                        <th>Priority</th>
+                                        <th>Client</th>
+                                        <th>Service</th>
+                                        <th>Time Window</th>
+                                        <th>Waiting</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in waitlist_entries %}
+                                    <tr class="waitlist-entry" 
+                                        data-priority="{{ entry.priority }}"
+                                        data-is-today="{{ entry.is_today|lower }}"
+                                        data-is-tomorrow="{{ entry.is_tomorrow|lower }}">
+                                        <td>
+                                            {% if entry.priority > 0 %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-exclamation me-1"></i>HIGH
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Normal</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ entry.client_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    <a href="tel:{{ entry.client_phone }}" class="text-decoration-none">
+                                                        <i class="fas fa-phone me-1"></i>{{ entry.client_phone }}
+                                                    </a>
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ entry.service_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ entry.service_duration }}min • {{ entry.service_price }}
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ entry.window_start_short }}</strong>
+                                                <br>
+                                                <small class="text-muted">to {{ entry.window_end_short }}</small>
+                                                {% if entry.is_today %}
+                                                <span class="badge bg-success ms-1">Today</span>
+                                                {% elif entry.is_tomorrow %}
+                                                <span class="badge bg-info ms-1">Tomorrow</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ entry.wait_time }}</small>
+                                            <br>
+                                            <small class="text-muted">{{ entry.created_at }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-outline-success" 
+                                                        title="Book Now" 
+                                                        onclick="bookNow({{ entry.id }}, '{{ entry.client_name }}', '{{ entry.service_name }}')">
+                                                    <i class="fas fa-calendar-plus"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-info" 
+                                                        title="Contact Client" 
+                                                        onclick="contactClient('{{ entry.client_phone }}', '{{ entry.client_name }}')">
+                                                    <i class="fas fa-comment"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-danger" 
+                                                        title="Remove from Waitlist" 
+                                                        onclick="removeFromWaitlist({{ entry.id }}, '{{ entry.client_name }}', '{{ entry.service_name }}')">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Waitlist Entries</h5>
+                            <p class="text-muted">
+                                Your waitlist is currently empty. Clients can join the waitlist when booking appointments.
+                            </p>
+                            <a href="/book" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Add Client to Waitlist
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Filter functions
+function showAll() {
+    document.querySelectorAll('.waitlist-entry').forEach(row => {
+        row.style.display = '';
+    });
+    updateActiveFilter(0);
+}
+
+function showPriority() {
+    document.querySelectorAll('.waitlist-entry').forEach(row => {
+        const priority = parseInt(row.dataset.priority);
+        row.style.display = priority > 0 ? '' : 'none';
+    });
+    updateActiveFilter(1);
+}
+
+function showToday() {
+    document.querySelectorAll('.waitlist-entry').forEach(row => {
+        const isToday = row.dataset.isToday === 'true';
+        const isTomorrow = row.dataset.isTomorrow === 'true';
+        row.style.display = (isToday || isTomorrow) ? '' : 'none';
+    });
+    updateActiveFilter(2);
+}
+
+function updateActiveFilter(index) {
+    document.querySelectorAll('.btn-group .btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+}
+
+// Action functions
+function bookNow(waitlistId, clientName, serviceName) {
+    alert(`Book Now feature coming soon!\n\nThis would:\n1. Show available slots for ${serviceName}\n2. Book ${clientName} directly\n3. Remove from waitlist automatically`);
+}
+
+function contactClient(phone, clientName) {
+    const message = `Hi ${clientName}, this is ${owner.name}. We have some availability that might work for your waitlist request. Please call us back to discuss scheduling options.`;
+    
+    if (confirm(`Contact ${clientName}?\n\nThis will open your messaging app with a pre-written message.`)) {
+        // Try WhatsApp first, fallback to SMS
+        const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+        const smsUrl = `sms:${phone}?body=${encodeURIComponent(message)}`;
+        
+        // Try to open WhatsApp, fallback to SMS
+        window.open(whatsappUrl, '_blank');
+    }
+}
+
+function removeFromWaitlist(waitlistId, clientName, serviceName) {
+    const confirmMessage = `Remove ${clientName} from the ${serviceName} waitlist?\n\nThis action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/owner/waitlist/remove/${waitlistId}`;
+        
+        const reasonInput = document.createElement('input');
+        reasonInput.type = 'hidden';
+        reasonInput.name = 'reason';
+        reasonInput.value = 'Owner removed via waitlist management';
+        form.appendChild(reasonInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function exportWaitlist() {
+    // Create CSV content
+    const headers = ['Priority', 'Client Name', 'Phone', 'Service', 'Duration', 'Price', 'Window Start', 'Window End', 'Wait Time', 'Created'];
+    const rows = [];
+    
+    document.querySelectorAll('.waitlist-entry').forEach(row => {
+        if (row.style.display !== 'none') {
+            const cells = row.querySelectorAll('td');
+            const rowData = [
+                cells[0].textContent.trim(),
+                cells[1].querySelector('strong').textContent,
+                cells[1].querySelector('a').textContent.trim(),
+                cells[2].querySelector('strong').textContent,
+                cells[2].querySelector('small').textContent.split('•')[0].trim(),
+                cells[2].querySelector('small').textContent.split('•')[1].trim(),
+                cells[3].querySelector('strong').textContent,
+                cells[3].querySelector('small').textContent.replace('to ', ''),
+                cells[4].textContent.trim().split('\n')[0],
+                cells[4].textContent.trim().split('\n')[1]
+            ];
+            rows.push(rowData);
+        }
+    });
+    
+    const csvContent = [headers, ...rows].map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+    
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `waitlist_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}

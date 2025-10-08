@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+{% block title %}Chat with {{ client.name }} - {{ owner.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: 70vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: linear-gradient(to bottom, #e5ddd5, #f0f0f0);
+        border-radius: 0.5rem 0.5rem 0 0;
+    }
+    
+    .message {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-end;
+    }
+    
+    .message.from-client {
+        justify-content: flex-start;
+    }
+    
+    .message.from-owner {
+        justify-content: flex-end;
+    }
+    
+    .message-bubble {
+        max-width: 70%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        position: relative;
+        word-wrap: break-word;
+    }
+    
+    .message.from-client .message-bubble {
+        background: white;
+        border-bottom-left-radius: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    .message.from-owner .message-bubble {
+        background: #dcf8c6;
+        border-bottom-right-radius: 0.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    .message-time {
+        font-size: 11px;
+        color: #666;
+        margin-top: 0.25rem;
+        text-align: right;
+    }
+    
+    .message.from-client .message-time {
+        text-align: left;
+    }
+    
+    .chat-input {
+        background: white;
+        border-radius: 0 0 0.5rem 0.5rem;
+        border-top: 1px solid #ddd;
+        padding: 1rem;
+    }
+    
+    .typing-indicator {
+        display: none;
+        padding: 0.5rem 1rem;
+        background: #f0f0f0;
+        border-radius: 1rem;
+        margin: 0.5rem 0;
+        font-style: italic;
+        color: #666;
+    }
+    
+    .client-info {
+        background: #25d366;
+        color: white;
+        padding: 1rem;
+        border-radius: 0.5rem 0.5rem 0 0;
+    }
+    
+    .quick-actions {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .scenario-btn {
+        margin: 0.25rem;
+    }
+    
+    .avatar-large {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #25d366, #128c7e);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 24px;
+    }
+    
+    .whatsapp-green {
+        background-color: #25d366;
+        border-color: #25d366;
+    }
+    
+    .whatsapp-green:hover {
+        background-color: #128c7e;
+        border-color: #128c7e;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #4caf50;
+        display: inline-block;
+        margin-left: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <a href="/messages" class="btn btn-outline-secondary me-3">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div class="avatar-large me-3">
+                        {{ client.name[0].upper() }}
+                    </div>
+                    <div>
+                        <h2 class="h4 mb-0">{{ client.name }}</h2>
+                        <p class="text-muted mb-0">
+                            {{ phone }}
+                            <span class="status-indicator" title="Online (Test Mode)"></span>
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info btn-sm" onclick="copyAllMessages()">
+                        <i class="fas fa-copy me-1"></i>Copy All
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" onclick="clearChat()">
+                        <i class="fas fa-broom me-1"></i>Clear Chat
+                    </button>
+                    <a href="tel:{{ phone }}" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-phone me-1"></i>Call
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Chat Interface -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="chat-container">
+                    <!-- Messages -->
+                    <div class="chat-messages" id="chatMessages">
+                        {% if messages %}
+                            {% for msg in messages %}
+                            <div class="message {{ 'from-client' if msg.is_from_client else 'from-owner' }}" 
+                                 data-message-id="{{ msg.id }}">
+                                <div class="message-bubble">
+                                    {{ msg.content }}
+                                    <div class="message-time">{{ msg.timestamp }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fab fa-whatsapp fa-3x mb-3"></i>
+                                <p>No messages yet. Start the conversation!</p>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="typing-indicator" id="typingIndicator">
+                            <i class="fas fa-circle-notch fa-spin me-2"></i>
+                            {{ client.name }} is typing...
+                        </div>
+                    </div>
+                    
+                    <!-- Message Input -->
+                    <div class="chat-input">
+                        <form onsubmit="sendMessage(event)" id="messageForm">
+                            <div class="row g-2">
+                                <div class="col">
+                                    <div class="input-group">
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" 
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <span id="senderLabel">
+                                                {% if request.query_params.get('as_client') == 'true' %}
+                                                <i class="fas fa-user me-1"></i>Client
+                                                {% else %}
+                                                <i class="fas fa-user-tie me-1"></i>Owner
+                                                {% endif %}
+                                            </span>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#" onclick="setSender(false)">
+                                                <i class="fas fa-user-tie me-2"></i>Send as Owner
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="setSender(true)">
+                                                <i class="fas fa-user me-2"></i>Send as Client
+                                            </a></li>
+                                        </ul>
+                                        <input type="text" class="form-control" id="messageInput" 
+                                               placeholder="Type a message..." required>
+                                        <input type="hidden" id="isFromClient" value="{{ 'true' if request.query_params.get('as_client') == 'true' else 'false' }}">
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn whatsapp-green text-white">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Client Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        Simulate Client Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm scenario-btn" 
+                                onclick="simulateAction('greeting')">
+                            <i class="fas fa-hand-wave me-2"></i>Say Hello
+                        </button>
+                        <button class="btn btn-outline-success btn-sm scenario-btn" 
+                                onclick="simulateAction('book_service', 'Haircut')">
+                            <i class="fas fa-calendar-plus me-2"></i>Request Haircut
+                        </button>
+                        <button class="btn btn-outline-info btn-sm scenario-btn" 
+                                onclick="simulateAction('join_waitlist', 'Quick Trim')">
+                            <i class="fas fa-users-clock me-2"></i>Join Waitlist
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm scenario-btn" 
+                                onclick="simulateAction('check_appointments')">
+                            <i class="fas fa-list me-2"></i>Check Appointments
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm scenario-btn" 
+                                onclick="simulateAction('cancel_appointment')">
+                            <i class="fas fa-times me-2"></i>Cancel Appointment
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm scenario-btn" 
+                                onclick="simulateAction('reschedule')">
+                            <i class="fas fa-edit me-2"></i>Reschedule
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Context -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-user me-2"></i>
+                        Client Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ client.name }}</p>
+                    <p><strong>Phone:</strong> {{ phone }}</p>
+                    
+                    {% if appointments %}
+                    <h6 class="mt-3">Recent Appointments:</h6>
+                    <ul class="list-unstyled">
+                        {% for apt in appointments[:3] %}
+                        <li class="mb-1">
+                            <small class="text-muted">
+                                {{ apt.start_dt.strftime('%m/%d %H:%M') }} - 
+                                {{ apt.service.name }} 
+                                <span class="badge badge-sm bg-{{ 'success' if apt.status.value == 'confirmed' else 'secondary' }}">
+                                    {{ apt.status.value }}
+                                </span>
+                            </small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if waitlist_entries %}
+                    <h6 class="mt-3">Waitlist:</h6>
+                    <ul class="list-unstyled">
+                        {% for entry in waitlist_entries %}
+                        <li class="mb-1">
+                            <small class="text-muted">
+                                {{ entry.service.name }}
+                                {% if entry.priority > 0 %}
+                                <span class="badge badge-sm bg-danger">HIGH</span>
+                                {% endif %}
+                            </small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Available Services -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cut me-2"></i>
+                        Available Services
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for service in services %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ service.name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ service.duration_min }}min</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>${{ "%.0f"|format(service.price_cents / 100) }}</strong>
+                            <br>
+                            <button class="btn btn-outline-primary btn-sm" 
+                                    onclick="simulateAction('book_service', '{{ service.name }}')">
+                                Book
+                            </button>
+                        </div>
+                    </div>
+                    {% if not loop.last %}<hr class="my-2">{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let isFromClient = {{ 'true' if request.query_params.get('as_client') == 'true' else 'false' }};
+let lastMessageCount = {{ messages|length }};
+
+function setSender(clientMode) {
+    isFromClient = clientMode;
+    document.getElementById('isFromClient').value = clientMode.toString();
+    document.getElementById('senderLabel').innerHTML = clientMode ? 
+        '<i class="fas fa-user me-1"></i>Client' : 
+        '<i class="fas fa-user-tie me-1"></i>Owner';
+}
+
+async function sendMessage(event) {
+    event.preventDefault();
+    
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (!message) return;
+    
+    // Show typing indicator if sending as client
+    if (isFromClient) {
+        showTypingIndicator();
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('phone', '{{ phone }}');
+        formData.append('message', message);
+        formData.append('is_from_client', isFromClient.toString());
+        
+        const response = await fetch('/messages/send', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            messageInput.value = '';
+            await refreshMessages();
+        } else {
+            alert('Error sending message: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Error sending message. Please try again.');
+    } finally {
+        hideTypingIndicator();
+    }
+}
+
+async function simulateAction(action, data = '') {
+    showTypingIndicator();
+    
+    try {
+        const formData = new FormData();
+        formData.append('phone', '{{ phone }}');
+        formData.append('action', action);
+        formData.append('data', data);
+        
+        const response = await fetch('/messages/simulate-client', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            await refreshMessages();
+        } else {
+            alert('Error simulating action: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error simulating action:', error);
+        alert('Error simulating action. Please try again.');
+    } finally {
+        hideTypingIndicator();
+    }
+}
+
+async function refreshMessages() {
+    try {
+        const response = await fetch(`/messages/api/conversation/{{ phone }}`);
+        const data = await response.json();
+        
+        console.log(`Refresh: ${data.messages.length} messages (was ${lastMessageCount})`);
+        
+        if (data.messages.length !== lastMessageCount) {
+            // Messages changed, refresh the chat
+            const chatMessages = document.getElementById('chatMessages');
+            
+            // Clear existing messages except typing indicator
+            const typingIndicator = document.getElementById('typingIndicator');
+            chatMessages.innerHTML = '';
+            chatMessages.appendChild(typingIndicator);
+            
+            // Add all messages
+            data.messages.forEach((msg, index) => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.is_from_client ? 'from-client' : 'from-owner'}`;
+                messageDiv.setAttribute('data-message-id', msg.id);
+                
+                // Convert newlines to <br> for proper display
+                const formattedContent = msg.content.replace(/\n/g, '<br>');
+                
+                messageDiv.innerHTML = `
+                    <div class="message-bubble">
+                        ${formattedContent}
+                        <div class="message-time">${msg.timestamp}</div>
+                    </div>
+                `;
+                
+                chatMessages.insertBefore(messageDiv, typingIndicator);
+                console.log(`Added message ${index + 1}: ${msg.content.substring(0, 50)}...`);
+            });
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            lastMessageCount = data.messages.length;
+            console.log(`Updated message count to ${lastMessageCount}`);
+        }
+    } catch (error) {
+        console.error('Error refreshing messages:', error);
+    }
+}
+
+function showTypingIndicator() {
+    document.getElementById('typingIndicator').style.display = 'block';
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    document.getElementById('typingIndicator').style.display = 'none';
+}
+
+function copyAllMessages() {
+    try {
+        const messages = document.querySelectorAll('.message');
+        let conversationText = `WhatsApp Conversation - ${new Date().toLocaleString()}\n`;
+        conversationText += `Client: {{ client.name }} ({{ phone }})\n`;
+        conversationText += `Business: {{ owner.name }}\n`;
+        conversationText += '=' + '='.repeat(50) + '\n\n';
+        
+        messages.forEach(message => {
+            const isFromClient = message.classList.contains('from-client');
+            const messageContent = message.querySelector('.message-bubble');
+            const timestamp = message.querySelector('.message-time');
+            
+            if (messageContent && timestamp) {
+                // Get clean text content (strip HTML)
+                const content = messageContent.innerHTML
+                    .replace(/<br\s*\/?>/gi, '\n')  // Convert <br> to newlines
+                    .replace(/<[^>]*>/g, '')        // Remove HTML tags
+                    .replace(/&nbsp;/g, ' ')        // Convert &nbsp; to spaces
+                    .replace(/&amp;/g, '&')         // Convert &amp; to &
+                    .replace(/&lt;/g, '<')          // Convert &lt; to <
+                    .replace(/&gt;/g, '>')          // Convert &gt; to >
+                    .trim();
+                
+                const sender = isFromClient ? '{{ client.name }}' : '{{ owner.name }}';
+                const time = timestamp.textContent.trim();
+                
+                conversationText += `[${time}] ${sender}:\n${content}\n\n`;
+            }
+        });
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(conversationText).then(() => {
+            // Show success feedback
+            const button = event.target.closest('button');
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+            button.classList.remove('btn-outline-info');
+            button.classList.add('btn-success');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('btn-success');
+                button.classList.add('btn-outline-info');
+            }, 2000);
+            
+            console.log('Conversation copied to clipboard');
+        }).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            
+            // Fallback: Create a textarea and select the text
+            const textarea = document.createElement('textarea');
+            textarea.value = conversationText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            alert('Conversation copied to clipboard!');
+        });
+        
+    } catch (error) {
+        console.error('Error copying messages:', error);
+        alert('Error copying messages. Please try again.');
+    }
+}
+
+async function clearChat() {
+    if (confirm('Clear this conversation? This cannot be undone.')) {
+        try {
+            const response = await fetch(`/messages/clear/{{ phone }}`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error clearing chat. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+            alert('Error clearing chat. Please try again.');
+        }
+    }
+}
+
+// Auto-refresh messages every 2 seconds for better responsiveness
+setInterval(refreshMessages, 2000);
+
+// Scroll to bottom on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Focus on message input
+    document.getElementById('messageInput').focus();
+});
+
+// Handle Enter key in message input
+document.getElementById('messageInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('messageForm').dispatchEvent(new Event('submit'));
+    }
+});
+</script>
+{% endblock %}

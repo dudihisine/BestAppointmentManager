@@ -1,0 +1,591 @@
+{% extends "base.html" %}
+
+{% block title %}Owner Dashboard - {{ owner.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 fw-bold">Owner Dashboard</h1>
+                    <p class="text-muted mb-0">
+                        {{ view_date_formatted }}
+                        {% if is_today %}
+                        <span class="badge bg-success ms-2">Today</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-primary fs-6">{{ owner.default_intent.value.title() }} Mode</span>
+                    <a href="/owner" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-cog me-1"></i>Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Navigation -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <!-- Previous/Next Week -->
+                        <div>
+                            <a href="/owner/dashboard?selected_date={{ prev_week_date }}" 
+                               class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-chevron-left me-1"></i>
+                                Previous Week
+                            </a>
+                        </div>
+
+                        <!-- Week View -->
+                        <div class="d-flex gap-2 flex-wrap justify-content-center">
+                            {% for day in week_data %}
+                            <a href="/owner/dashboard?selected_date={{ day.iso_date }}" 
+                               class="btn btn-sm position-relative
+                                      {% if day.is_selected %}btn-primary{% elif day.is_today %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}">
+                                <div class="text-center">
+                                    <div class="fw-bold">{{ day.formatted_date }}</div>
+                                    {% if day.appointment_count > 0 %}
+                                    <small class="d-block">{{ day.appointment_count }} apt{{ 's' if day.appointment_count != 1 else '' }}</small>
+                                    <small class="d-block">${{ "%.0f"|format(day.revenue / 100) }}</small>
+                                    {% else %}
+                                    <small class="d-block text-muted">Free</small>
+                                    {% endif %}
+                                </div>
+                                {% if day.appointment_count > 0 %}
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    {{ day.appointment_count }}
+                                </span>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Next Week -->
+                        <div>
+                            <a href="/owner/dashboard?selected_date={{ next_week_date }}" 
+                               class="btn btn-outline-secondary btn-sm">
+                                Next Week
+                                <i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Quick Date Jump -->
+                    <div class="row mt-3">
+                        <div class="col-12 text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/owner/dashboard" class="btn btn-outline-primary">Today</a>
+                                <a href="/owner/dashboard?selected_date={{ tomorrow_date }}" 
+                                   class="btn btn-outline-secondary">Tomorrow</a>
+                                <input type="date" class="form-control form-control-sm" 
+                                       style="width: auto; display: inline-block;" 
+                                       value="{{ view_date.isoformat() }}"
+                                       onchange="window.location.href='/owner/dashboard?selected_date=' + this.value">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle me-2"></i>
+        {{ request.query_params.get('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        {{ request.query_params.get('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Today's Appointments</h6>
+                            <h2 class="mb-0">{{ appointment_count }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar-check fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Projected Revenue</h6>
+                            <h2 class="mb-0">{{ total_revenue }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Waitlist Clients</h6>
+                            <h2 class="mb-0">{{ waitlist_stats.total_entries }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-stat">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-white-50 mb-1">Optimization Tips</h6>
+                            <h2 class="mb-0">{{ suggestions|length }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-lightbulb fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Today's Schedule -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-day me-2"></i>
+                        {% if is_today %}
+                        Today's Schedule
+                        {% else %}
+                        Schedule for {{ view_date_formatted }}
+                        {% endif %}
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if appointments %}
+                        <div class="timeline">
+                            {% for apt in appointments %}
+                            <div class="appointment-card card mb-3">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-2">
+                                            <div class="text-center">
+                                                <div class="h5 mb-0 text-primary">{{ apt.start_time }}</div>
+                                                <small class="text-muted">{{ apt.duration }}min</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <h6 class="mb-1">{{ apt.client_name }}</h6>
+                                            <p class="mb-1 text-muted">{{ apt.service_name }}</p>
+                                            <small class="text-muted">
+                                                <i class="fas fa-phone me-1"></i>
+                                                {{ apt.client_phone }}
+                                            </small>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <span class="badge bg-{{ 'success' if apt.status == 'confirmed' else 'warning' }}">
+                                                {{ apt.status.title() }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2 text-end">
+                                            <div class="h6 mb-0 text-success">{{ apt.price }}</div>
+                                        </div>
+                                        <div class="col-md-1">
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                        data-bs-toggle="dropdown">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item" href="tel:{{ apt.client_phone }}">
+                                                        <i class="fas fa-phone me-2"></i>Call Client
+                                                    </a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="rescheduleAppointment({{ apt.id }})">
+                                                        <i class="fas fa-edit me-2"></i>Reschedule
+                                                    </a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-danger" href="#" onclick="cancelAppointment({{ apt.id }}, '{{ apt.client_name }}', '{{ apt.service_name }}', '{{ apt.start_time }}')">
+                                                        <i class="fas fa-times me-2"></i>Cancel & Fill Gap
+                                                    </a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">
+                                {% if is_today %}
+                                No Appointments Today
+                                {% else %}
+                                No Appointments on {{ view_date_formatted }}
+                                {% endif %}
+                            </h5>
+                            <p class="text-muted">
+                                {% if is_today %}
+                                Your schedule is clear for today.
+                                {% else %}
+                                Your schedule is clear for this date.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Intent Mode Control -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-target me-2"></i>
+                        Business Mode
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Choose how the AI optimizes your schedule:
+                    </p>
+                    
+                    <form method="post" action="/owner/change-intent">
+                        <div class="mb-3">
+                            {% for mode in intent_modes %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="intent" 
+                                       id="intent_{{ mode }}" value="{{ mode }}"
+                                       {{ 'checked' if owner.default_intent.value == mode else '' }}>
+                                <label class="form-check-label" for="intent_{{ mode }}">
+                                    <strong>{{ mode.title() }}</strong>
+                                    {% if mode == 'max_profit' %}
+                                    <br><small class="text-muted">Maximize revenue & pack schedule tight</small>
+                                    {% elif mode == 'balanced' %}
+                                    <br><small class="text-muted">Balance revenue with even spacing</small>
+                                    {% elif mode == 'free_time' %}
+                                    <br><small class="text-muted">Protect breaks & personal time</small>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-save me-1"></i>
+                            Update Mode
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Optimization Suggestions -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        AI Assistant
+                    </h6>
+                    <small class="text-muted">{{ owner.default_intent.value.title() }} Mode</small>
+                </div>
+                <div class="card-body">
+                    {% if suggestions %}
+                        <div class="suggestions-container" style="max-height: 300px; overflow-y: auto;" id="suggestionsContainer">
+                            {% for suggestion in suggestions %}
+                            <div class="alert suggestion-item
+                                {% if suggestion.type == 'mode_suggestion' %}alert-primary
+                                {% elif suggestion.type in ['revenue_boost', 'upsell_opportunity'] %}alert-success
+                                {% elif suggestion.type in ['fill_gap', 'efficiency_tip'] %}alert-info
+                                {% elif suggestion.type in ['overbooked_warning', 'workload_warning'] %}alert-warning
+                                {% else %}alert-light{% endif %} 
+                                mb-2 p-2 border-start border-3"
+                                data-suggestion-type="{{ suggestion.type }}"
+                                style="animation: fadeIn 0.3s ease-in;">
+                                <small class="d-block">
+                                    {{ suggestion.suggestion }}
+                                </small>
+                                {% if suggestion.type == 'fill_gap' and suggestion.gap_formatted %}
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary">{{ suggestion.gap_formatted }} available</span>
+                                    {% if suggestion.gap_start_time and suggestion.gap_end_time %}
+                                    <span class="badge bg-info ms-1">{{ suggestion.gap_start_time }} - {{ suggestion.gap_end_time }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {{ suggestions|length }} AI suggestions • Updates when you change modes
+                            </small>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-robot fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">
+                                AI is analyzing your schedule...
+                            </p>
+                            <small class="text-muted">Suggestions will appear based on your {{ owner.default_intent.value.title() }} mode</small>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Mode Explanation -->
+                    <div class="mt-3 p-2 bg-light rounded">
+                        <small class="text-muted">
+                            <strong>Current Mode:</strong>
+                            {% if owner.default_intent.value == 'max_profit' %}
+                            💰 <strong>Max Profit</strong> - AI focuses on revenue optimization and high-value services
+                            {% elif owner.default_intent.value == 'balanced' %}
+                            ⚖️ <strong>Balanced</strong> - AI balances revenue with workload and spacing
+                            {% elif owner.default_intent.value == 'free_time' %}
+                            🌿 <strong>Free Time</strong> - AI protects personal time and prevents overwork
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waitlist Overview -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        Waitlist Overview
+                    </h6>
+                    <a href="/owner/waitlist" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>
+                        Manage
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if waitlist_stats.by_service %}
+                        {% for service_stat in waitlist_stats.by_service %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ service_stat.service }}</span>
+                            <span class="badge bg-primary">{{ service_stat.count }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No clients on waitlist</p>
+                    {% endif %}
+                    
+                    {% if waitlist_stats.high_priority > 0 %}
+                    <hr>
+                    <small class="text-warning">
+                        <i class="fas fa-star me-1"></i>
+                        {{ waitlist_stats.high_priority }} high priority clients
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>
+                        Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="refreshSchedule()">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Refresh Schedule
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="window.location.href='/book'">
+                            <i class="fas fa-plus me-2"></i>
+                            Manual Booking
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="exportSchedule()">
+                            <i class="fas fa-download me-2"></i>
+                            Export Today's Schedule
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="window.open('/', '_blank')">
+                            <i class="fas fa-eye me-2"></i>
+                            View Client Site
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshSchedule() {
+    window.location.reload();
+}
+
+function exportSchedule() {
+    // Simple CSV export of today's appointments
+    const appointments = {{ appointments | tojson }};
+    
+    if (appointments.length === 0) {
+        alert('No appointments to export today.');
+        return;
+    }
+    
+    let csv = 'Time,Client,Phone,Service,Duration,Price,Status\n';
+    
+    appointments.forEach(apt => {
+        csv += `"${apt.start_time}","${apt.client_name}","${apt.client_phone}","${apt.service_name}","${apt.duration}min","${apt.price}","${apt.status}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `schedule-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function cancelAppointment(appointmentId, clientName, serviceName, startTime) {
+    const confirmMessage = `Cancel appointment for ${clientName}?\n\n` +
+                          `Service: ${serviceName}\n` +
+                          `Time: ${startTime}\n\n` +
+                          `This will trigger gap-fill optimization to automatically:\n` +
+                          `• Notify waitlisted clients about the available slot\n` +
+                          `• Try to move other appointments to fill gaps\n` +
+                          `• Optimize the overall schedule\n\n` +
+                          `Continue with cancellation?`;
+    
+    if (confirm(confirmMessage)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/owner/cancel-appointment/${appointmentId}`;
+        
+        const reasonInput = document.createElement('input');
+        reasonInput.type = 'hidden';
+        reasonInput.name = 'reason';
+        reasonInput.value = 'Owner cancellation via dashboard';
+        form.appendChild(reasonInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function rescheduleAppointment(appointmentId) {
+    alert('Reschedule feature coming soon! For now, cancel and rebook manually.');
+}
+
+// Auto-refresh every 10 minutes (less aggressive)
+setInterval(() => {
+    // Only refresh if user hasn't interacted recently
+    if (document.lastInteraction && (Date.now() - document.lastInteraction) < 60000) {
+        console.log('Skipping auto-refresh due to recent user interaction');
+        return;
+    }
+    window.location.reload();
+}, 10 * 60 * 1000);
+
+// Track user interactions to prevent unwanted refreshes
+document.addEventListener('click', () => {
+    document.lastInteraction = Date.now();
+});
+
+document.addEventListener('scroll', () => {
+    document.lastInteraction = Date.now();
+});
+
+// Add real-time clock
+function updateClock() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    document.title = `Owner Dashboard - ${timeString}`;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// Prevent suggestions from disappearing
+document.addEventListener('DOMContentLoaded', function() {
+    // Disable auto-dismiss on suggestion alerts
+    const suggestionAlerts = document.querySelectorAll('.suggestion-item');
+    suggestionAlerts.forEach(alert => {
+        // Remove any close buttons
+        const closeBtn = alert.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.remove();
+        }
+        
+        // Prevent Bootstrap from auto-dismissing
+        alert.addEventListener('close.bs.alert', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+        
+        // Force visibility
+        alert.style.display = 'block';
+        alert.style.visibility = 'visible';
+        alert.style.opacity = '1';
+    });
+    
+    // Debug: Log suggestions count
+    console.log(`AI Suggestions loaded: ${suggestionAlerts.length}`);
+    
+    // Monitor for disappearing suggestions
+    setInterval(() => {
+        const visibleSuggestions = document.querySelectorAll('.suggestion-item:not([style*="display: none"])');
+        if (visibleSuggestions.length !== suggestionAlerts.length) {
+            console.warn('Some suggestions disappeared! Restoring...');
+            suggestionAlerts.forEach(alert => {
+                alert.style.display = 'block';
+                alert.style.visibility = 'visible';
+                alert.style.opacity = '1';
+            });
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}

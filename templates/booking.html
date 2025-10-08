@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Book Appointment - {{ owner.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold">Book Your Appointment</h1>
+                <p class="lead text-muted">Fill in your details and choose your preferred time</p>
+            </div>
+
+            <!-- Booking Form -->
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="post" action="/book" id="bookingForm">
+                        <!-- Step 1: Personal Information -->
+                        <div class="step" id="step1">
+                            <h4 class="mb-4">
+                                <span class="badge bg-primary me-2">1</span>
+                                Your Information
+                            </h4>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="name" class="form-label">Full Name *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="phone" class="form-label">Phone Number *</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           placeholder="+1234567890" required>
+                                </div>
+                                <div class="col-12">
+                                    <label for="email" class="form-label">Email (Optional)</label>
+                                    <input type="email" class="form-control" id="email" name="email">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Service Selection -->
+                        <div class="step d-none" id="step2">
+                            <h4 class="mb-4">
+                                <span class="badge bg-primary me-2">2</span>
+                                Choose Your Service
+                            </h4>
+                            
+                            <div class="row g-3">
+                                {% for service in services %}
+                                <div class="col-md-6">
+                                    <div class="card service-option" data-service-id="{{ service.id }}">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">{{ service.name }}</h6>
+                                            <p class="text-muted small mb-2">{{ service.duration_min }} minutes</p>
+                                            <div class="h5 text-primary fw-bold">
+                                                ${{ "%.0f"|format(service.price_cents / 100) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" id="service_id" name="service_id" value="{{ selected_service.id if selected_service else '' }}">
+                        </div>
+
+                        <!-- Step 3: Time Preference -->
+                        <div class="step d-none" id="step3">
+                            <h4 class="mb-4">
+                                <span class="badge bg-primary me-2">3</span>
+                                When would you like to come?
+                            </h4>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="card time-preference" data-preference="today">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-clock fa-2x text-primary mb-2"></i>
+                                            <h6>Today</h6>
+                                            <small class="text-muted">Available slots today</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card time-preference" data-preference="tomorrow">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-sun fa-2x text-primary mb-2"></i>
+                                            <h6>Tomorrow</h6>
+                                            <small class="text-muted">Next day slots</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card time-preference" data-preference="this_week">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-calendar-week fa-2x text-primary mb-2"></i>
+                                            <h6>This Week</h6>
+                                            <small class="text-muted">Next 7 days</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card time-preference" data-preference="next_week">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-calendar-alt fa-2x text-primary mb-2"></i>
+                                            <h6>Next Week</h6>
+                                            <small class="text-muted">Following week</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="preference" name="preference">
+                        </div>
+
+                        <!-- Navigation Buttons -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-secondary" id="prevBtn" onclick="changeStep(-1)">
+                                <i class="fas fa-arrow-left me-2"></i>Previous
+                            </button>
+                            <button type="button" class="btn btn-primary" id="nextBtn" onclick="changeStep(1)">
+                                Next<i class="fas fa-arrow-right ms-2"></i>
+                            </button>
+                            <button type="submit" class="btn btn-success d-none" id="submitBtn">
+                                <i class="fas fa-search me-2"></i>Find Available Times
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 3;
+
+// Initialize form
+document.addEventListener('DOMContentLoaded', function() {
+    updateStepDisplay();
+    
+    // Pre-select service if provided
+    {% if selected_service %}
+    document.getElementById('service_id').value = {{ selected_service.id }};
+    document.querySelector(`[data-service-id="{{ selected_service.id }}"]`).classList.add('selected');
+    {% endif %}
+});
+
+function changeStep(direction) {
+    if (direction === 1 && !validateCurrentStep()) {
+        return;
+    }
+    
+    currentStep += direction;
+    
+    if (currentStep < 1) currentStep = 1;
+    if (currentStep > totalSteps) currentStep = totalSteps;
+    
+    updateStepDisplay();
+}
+
+function updateStepDisplay() {
+    // Hide all steps
+    document.querySelectorAll('.step').forEach(step => {
+        step.classList.add('d-none');
+    });
+    
+    // Show current step
+    document.getElementById(`step${currentStep}`).classList.remove('d-none');
+    
+    // Update buttons
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    prevBtn.style.display = currentStep === 1 ? 'none' : 'block';
+    
+    if (currentStep === totalSteps) {
+        nextBtn.classList.add('d-none');
+        submitBtn.classList.remove('d-none');
+    } else {
+        nextBtn.classList.remove('d-none');
+        submitBtn.classList.add('d-none');
+    }
+}
+
+function validateCurrentStep() {
+    if (currentStep === 1) {
+        const name = document.getElementById('name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        
+        if (!name || !phone) {
+            alert('Please fill in your name and phone number.');
+            return false;
+        }
+    }
+    
+    if (currentStep === 2) {
+        const serviceId = document.getElementById('service_id').value;
+        if (!serviceId) {
+            alert('Please select a service.');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Service selection
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.service-option')) {
+        const serviceCard = e.target.closest('.service-option');
+        const serviceId = serviceCard.dataset.serviceId;
+        
+        // Remove previous selection
+        document.querySelectorAll('.service-option').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Add selection
+        serviceCard.classList.add('selected');
+        document.getElementById('service_id').value = serviceId;
+    }
+});
+
+// Time preference selection
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.time-preference')) {
+        const prefCard = e.target.closest('.time-preference');
+        const preference = prefCard.dataset.preference;
+        
+        // Remove previous selection
+        document.querySelectorAll('.time-preference').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Add selection
+        prefCard.classList.add('selected');
+        document.getElementById('preference').value = preference;
+    }
+});
+
+// Add CSS for selected state
+const style = document.createElement('style');
+style.textContent = `
+    .service-option, .time-preference {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+    
+    .service-option:hover, .time-preference:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    
+    .service-option.selected, .time-preference.selected {
+        border-color: var(--primary-color);
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}
